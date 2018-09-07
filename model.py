@@ -11,6 +11,7 @@ from utils import *
 
 
 class cyclegan(object):
+    print ("class cyclegan!!")
     def __init__(self, sess, args):
         self.sess = sess
         self.batch_size = args.batch_size
@@ -112,6 +113,16 @@ class cyclegan(object):
         self.testB = self.generator(self.test_A, self.options, True, name="generatorA2B")
         self.testA = self.generator(self.test_B, self.options, True, name="generatorB2A")
 
+        self.infer_inp = tf.identity(self.real_A,name='infer_inp')
+        self.infer_out = tf.identity(self.fake_B,name='infer_out')
+
+        tb_images = tf.concat([self.real_A, self.fake_B, self.real_B, self.fake_A],axis=0)
+        tf.summary.image('tb_images_summ', tensor=tb_images, collections=['tb_imgs'],max_outputs=4)
+        # tf.summary.image('fake_A_img', tensor=self.fake_A, collections=['tb_imgs'])
+        # tf.summary.image('fake_B_img', tensor=self.fake_B, collections=['tb_imgs'])
+        # tf.summary.image('real_A_img', tensor=self.real_A, collections=['tb_imgs'])
+        # tf.summary.image('real_B_img', tensor=self.real_B, collections=['tb_imgs'])
+
         t_vars = tf.trainable_variables()
         self.d_vars = [var for var in t_vars if 'discriminator' in var.name]
         self.g_vars = [var for var in t_vars if 'generator' in var.name]
@@ -139,8 +150,10 @@ class cyclegan(object):
                 print(" [!] Load failed...")
 
         for epoch in range(args.epoch):
-            dataA = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/trainA'))
-            dataB = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/trainB'))
+            # dataA = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/trainA'))
+            # dataB = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/trainB'))
+            dataA = glob(self.dataset_dir + '/trainA/*.*')
+            dataB = glob(self.dataset_dir + '/trainB/*.*')
             np.random.shuffle(dataA)
             np.random.shuffle(dataB)
             batch_idxs = min(min(len(dataA), len(dataB)), args.train_size) // self.batch_size
@@ -173,14 +186,14 @@ class cyclegan(object):
                     epoch, idx, batch_idxs, time.time() - start_time)))
 
                 if np.mod(counter, args.print_freq) == 1:
-                    self.sample_model(args.sample_dir, epoch, idx)
+                    self.sample_model(args.sample_dir, epoch, idx, counter, args)
 
                 if np.mod(counter, args.save_freq) == 2:
                     self.save(args.checkpoint_dir, counter)
 
     def save(self, checkpoint_dir, step):
         model_name = "cyclegan.model"
-        model_dir = "%s_%s" % (self.dataset_dir, self.image_size)
+        model_dir = "chpt_model_"+str(self.image_size)
         checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
 
         if not os.path.exists(checkpoint_dir):
@@ -204,19 +217,24 @@ class cyclegan(object):
         else:
             return False
 
-    def sample_model(self, sample_dir, epoch, idx):
-        dataA = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testA'))
-        dataB = glob('./datasets/{}/*.*'.format(self.dataset_dir + '/testB'))
+    def sample_model(self, sample_dir, epoch, idx, counter, args):
+        dataA = glob(self.dataset_dir + '/trainA/*.*')
+        dataB = glob(self.dataset_dir + '/trainB/*.*')
         np.random.shuffle(dataA)
         np.random.shuffle(dataB)
         batch_files = list(zip(dataA[:self.batch_size], dataB[:self.batch_size]))
-        sample_images = [load_train_data(batch_file, is_testing=True) for batch_file in batch_files]
+        sample_images = [load_train_data(batch_file, is_testing=True, load_size=args.load_size, fine_size=args.fine_size) for batch_file in batch_files]
         sample_images = np.array(sample_images).astype(np.float32)
+        print (np.shape(sample_images))
 
-        fake_A, fake_B = self.sess.run(
-            [self.fake_A, self.fake_B],
-            feed_dict={self.real_data: sample_images}
-        )
+        summaries = tf.get_collection(key='tb_imgs')
+        fake_A, fake_B, tb_images = self.sess.run([self.fake_A, self.fake_B]+summaries,feed_dict={self.real_data: sample_images})
+        self.writer.add_summary(tb_images,counter)
+        # self.writer.add_summary(real_A_img,counter)
+        # self.writer.add_summary(real_B_img,counter)
+        # self.writer.add_summary(fake_A_img,counter)
+        # self.writer.add_summary(fake_B_img,counter)
+
         save_images(fake_A, [self.batch_size, 1],
                     './{}/A_{:02d}_{:04d}.jpg'.format(sample_dir, epoch, idx))
         save_images(fake_B, [self.batch_size, 1],
@@ -262,3 +280,14 @@ class cyclegan(object):
                 '..' + os.path.sep + image_path)))
             index.write("</tr>")
         index.close()
+
+    # def infer(self, args, frame):
+    #     """Use in inference mode"""
+    #     init_op = tf.global_variables_initializer()
+    #     self.sess.run(init_op)
+    #
+    #     out_var, in_var = (self.testB, self.test_A) if args.which_direction == 'AtoB' else (
+    #         self.testA, self.test_B)
+    #     print('Processing frame.')
+    #     fake_frame = self.sess.run(out_var, feed_dict={in_var: frame})
+    #     return fake_frame

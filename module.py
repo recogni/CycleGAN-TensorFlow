@@ -21,9 +21,11 @@ def discriminator(image, options, reuse=False, name="discriminator"):
         # h2 is (32x 32 x self.df_dim*4)
         h3 = lrelu(instance_norm(conv2d(h2, options.df_dim*8, s=1, name='d_h3_conv'), 'd_bn3'))
         # h3 is (32 x 32 x self.df_dim*8)
-        h4 = conv2d(h3, 1, s=1, name='d_h3_pred')
+        h4 = lrelu(instance_norm(conv2d(h3, options.df_dim*16, s=1, name='d_h4_conv'), 'd_bn4'))
+        # h4 is (32 x 32 x self.df_dim*8)
+        h5 = conv2d(h4, 1, s=1, name='d_h4_pred')
         # h4 is (32 x 32 x 1)
-        return h4
+        return h5
 
 
 def generator_unet(image, options, reuse=False, name="generator"):
