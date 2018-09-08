@@ -48,23 +48,39 @@ def load_test_data(image_path, fine_size=256):
     img = img/127.5 - 1
     return img
 
-def load_train_data(image_path, load_size=286, fine_size=256, is_testing=False):
+def load_train_data(image_path, args):
+    aspect_ratio = float(args.fine_size_W) / float(args.fine_size_H)
     img_A = imread(image_path[0])
     img_B = imread(image_path[1])
-    if not is_testing:
-        img_A = scipy.misc.imresize(img_A, [load_size, load_size])
-        img_B = scipy.misc.imresize(img_B, [load_size, load_size])
-        h1 = int(np.ceil(np.random.uniform(1e-2, load_size-fine_size)))
-        w1 = int(np.ceil(np.random.uniform(1e-2, load_size-fine_size)))
-        img_A = img_A[h1:h1+fine_size, w1:w1+fine_size]
-        img_B = img_B[h1:h1+fine_size, w1:w1+fine_size]
+    img_shape_A = np.shape(img_A)
+    img_shape_B = np.shape(img_B)
+    img_ratio_A = float(img_shape_A[1])/float(img_shape_A[0]) # width/height (should be 2.0 in the case of cityscape)
+    img_ratio_B = float(img_shape_B[1])/float(img_shape_B[0]) # width/height (should be 2.0 in the case of cityscape)
 
-        if np.random.random() > 0.5:
-            img_A = np.fliplr(img_A)
-            img_B = np.fliplr(img_B)
-    else:
-        img_A = scipy.misc.imresize(img_A, [fine_size, fine_size])
-        img_B = scipy.misc.imresize(img_B, [fine_size, fine_size])
+    if img_ratio_A >= aspect_ratio: #meaning: its wider format than necessary
+        img_A = scipy.misc.imresize(img_A, [args.load_size_H, int(float(img_shape_A[1])/(float(img_shape_A[0])/float(args.load_size_H)))])
+        border_W = int((np.shape(img_A)[1]-args.load_size_W)/2)
+        img_A = img_A[:,border_W:border_W+args.load_size_W]
+    else: #meaning: it is higher format than necessary
+        img_A = scipy.misc.imresize(img_A, [int(float(img_shape_A[0])/(float(img_shape_A[1])/float(args.load_size_W))), args.load_size_W])
+        border_H = int((np.shape(img_A)[0]-args.load_size_H)/2)
+        img_A = img_A[:,border_H:border_H+args.load_size_H]
+
+    if img_ratio_B >= aspect_ratio: #meaning: its wider format than necessary
+        img_B = scipy.misc.imresize(img_B, [args.load_size_H, int(float(img_shape_B[1])/(float(img_shape_B[0])/float(args.load_size_H)))])
+        border_W = int((np.shape(img_B)[1]-args.load_size_W)/2)
+        img_B = img_B[:,border_W:border_W+args.load_size_W]
+    else: #meaning: it is higher format than necessary
+        img_B = scipy.misc.imresize(img_B, [int(float(img_shape_B[0])/(float(img_shape_B[1])/float(args.load_size_W))), args.load_size_W])
+        border_H = int((np.shape(img_B)[0]-args.load_size_H)/2)
+        img_B = img_B[:,border_H:border_H+args.load_size_H]
+
+    # print ('img_A and img_B have shapes '+str(np.shape(img_A))+' and '+str(np.shape(img_B)))
+
+    h1 = int(np.ceil(np.random.uniform(1e-2, args.load_size_H-args.fine_size_H)))
+    w1 = int(np.ceil(np.random.uniform(1e-2, args.load_size_W-args.fine_size_W)))
+    img_A = img_A[h1:h1+args.fine_size_H, w1:w1+args.fine_size_W]
+    img_B = img_B[h1:h1+args.fine_size_H, w1:w1+args.fine_size_W]
 
     img_A = img_A/127.5 - 1.
     img_B = img_B/127.5 - 1.

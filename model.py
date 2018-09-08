@@ -15,7 +15,8 @@ class cyclegan(object):
     def __init__(self, sess, args):
         self.sess = sess
         self.batch_size = args.batch_size
-        self.image_size = args.fine_size
+        self.image_size_H = args.fine_size_H
+        self.image_size_W = args.fine_size_W
         self.input_c_dim = args.input_nc
         self.output_c_dim = args.output_nc
         self.L1_lambda = args.L1_lambda
@@ -31,9 +32,9 @@ class cyclegan(object):
         else:
             self.criterionGAN = sce_criterion
 
-        OPTIONS = namedtuple('OPTIONS', 'batch_size image_size \
+        OPTIONS = namedtuple('OPTIONS', 'batch_size image_size_H image_size_W \
                               gf_dim df_dim output_c_dim is_training')
-        self.options = OPTIONS._make((args.batch_size, args.fine_size,
+        self.options = OPTIONS._make((args.batch_size, args.fine_size_H, args.fine_size_W,
                                       args.ngf, args.ndf, args.output_nc,
                                       args.phase == 'train'))
 
@@ -43,7 +44,7 @@ class cyclegan(object):
 
     def _build_model(self):
         self.real_data = tf.placeholder(tf.float32,
-                                        [None, self.image_size, self.image_size,
+                                        [None, self.image_size_H, self.image_size_W,
                                          self.input_c_dim + self.output_c_dim],
                                         name='real_A_and_B_images')
 
@@ -69,10 +70,10 @@ class cyclegan(object):
             + self.L1_lambda * abs_criterion(self.real_B, self.fake_B_)
 
         self.fake_A_sample = tf.placeholder(tf.float32,
-                                            [None, self.image_size, self.image_size,
+                                            [None, self.image_size_H, self.image_size_W,
                                              self.input_c_dim], name='fake_A_sample')
         self.fake_B_sample = tf.placeholder(tf.float32,
-                                            [None, self.image_size, self.image_size,
+                                            [None, self.image_size_H, self.image_size_W,
                                              self.output_c_dim], name='fake_B_sample')
         self.DB_real = self.discriminator(self.real_B, self.options, reuse=True, name="discriminatorB")
         self.DA_real = self.discriminator(self.real_A, self.options, reuse=True, name="discriminatorA")
@@ -105,16 +106,16 @@ class cyclegan(object):
         )
 
         self.test_A = tf.placeholder(tf.float32,
-                                     [None, self.image_size, self.image_size,
+                                     [None, self.image_size_H, self.image_size_W,
                                       self.input_c_dim], name='test_A')
         self.test_B = tf.placeholder(tf.float32,
-                                     [None, self.image_size, self.image_size,
+                                     [None, self.image_size_H, self.image_size_W,
                                       self.output_c_dim], name='test_B')
         self.testB = self.generator(self.test_A, self.options, True, name="generatorA2B")
         self.testA = self.generator(self.test_B, self.options, True, name="generatorB2A")
 
-        self.infer_inp = tf.identity(self.real_A,name='infer_inp')
-        self.infer_out = tf.identity(self.fake_B,name='infer_out')
+        self.infer_inp = tf.identity(self.test_A,name='infer_inp')
+        self.infer_out = tf.identity(self.testB,name='infer_out')
 
         tb_images = tf.concat([self.real_A, self.fake_B, self.real_B, self.fake_A],axis=0)
         tf.summary.image('tb_images_summ', tensor=tb_images, collections=['tb_imgs'],max_outputs=4)
@@ -162,7 +163,7 @@ class cyclegan(object):
             for idx in range(0, batch_idxs):
                 batch_files = list(zip(dataA[idx * self.batch_size:(idx + 1) * self.batch_size],
                                        dataB[idx * self.batch_size:(idx + 1) * self.batch_size]))
-                batch_images = [load_train_data(batch_file, args.load_size, args.fine_size) for batch_file in batch_files]
+                batch_images = [load_train_data(batch_file, args) for batch_file in batch_files]
                 batch_images = np.array(batch_images).astype(np.float32)
 
                 # Update G network and record fake outputs
@@ -193,7 +194,7 @@ class cyclegan(object):
 
     def save(self, checkpoint_dir, step):
         model_name = "cyclegan.model"
-        model_dir = "chpt_model_"+str(self.image_size)
+        model_dir = "chpt_model_"+str(self.image_size_H)+"_"+str(self.image_size_W)
         checkpoint_dir = os.path.join(checkpoint_dir, model_dir)
 
         if not os.path.exists(checkpoint_dir):
@@ -223,7 +224,7 @@ class cyclegan(object):
         np.random.shuffle(dataA)
         np.random.shuffle(dataB)
         batch_files = list(zip(dataA[:self.batch_size], dataB[:self.batch_size]))
-        sample_images = [load_train_data(batch_file, is_testing=True, load_size=args.load_size, fine_size=args.fine_size) for batch_file in batch_files]
+        sample_images = [load_train_data(batch_file, args) for batch_file in batch_files]
         sample_images = np.array(sample_images).astype(np.float32)
         print (np.shape(sample_images))
 
