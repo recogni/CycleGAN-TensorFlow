@@ -28,7 +28,7 @@ with tf.Session() as session:
     graph = tf.get_default_graph()
     # frame_inp = graph.get_operation_by_name(name='infer_inp')
     # frame_out = graph.get_operation_by_name(name='infer_out')
-    frame_inp = graph.get_tensor_by_name(name='infer_inp:0')
+    frame_inp = graph.get_tensor_by_name(name='test_A:0')
     frame_out = graph.get_tensor_by_name(name='infer_out:0')
     print ('Finished restoring input and output tensor operators !')
 
